@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistem Monitoring Kelembaban — ITS Teknik Instrumentasi</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1e2530;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --text3: #484f58;
+    --teal: #1D9E75;
+    --teal-light: #5DCAA5;
+    --teal-dim: rgba(29,158,117,0.15);
+    --blue: #378ADD;
+    --blue-dim: rgba(55,138,221,0.15);
+    --amber: #EF9F27;
+    --amber-dim: rgba(239,159,39,0.15);
+    --red: #E24B4A;
+    --red-dim: rgba(226,75,74,0.15);
+    --green: #3FB950;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--teal-light);
+    letter-spacing: 0.02em;
+  }
+
+  .logo-icon {
+    width: 28px; height: 28px;
+    border: 1.5px solid var(--teal);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid;
+    letter-spacing: 0.04em;
+    transition: all 0.3s;
+  }
+  .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .status-normal { background: rgba(63,185,80,0.1); border-color: rgba(63,185,80,0.3); color: var(--green); }
+  .status-normal .dot { background: var(--green); animation: pulse-green 2s infinite; }
+  .status-high { background: var(--red-dim); border-color: rgba(226,75,74,0.4); color: var(--red); }
+  .status-high .dot { background: var(--red); animation: pulse-red 1s infinite; }
+  .status-low { background: var(--amber-dim); border-color: rgba(239,159,39,0.4); color: var(--amber); }
+  .status-low .dot { background: var(--amber); animation: pulse-amber 1s infinite; }
+  .status-error { background: rgba(139,148,158,0.1); border-color: rgba(139,148,158,0.3); color: var(--text2); }
+  .status-error .dot { background: var(--text2); }
+
+  @keyframes pulse-green { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+  @keyframes pulse-red   { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.4)} }
+  @keyframes pulse-amber { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.4)} }
+
+  .time-display {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text3);
+  }
+
+  main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 20px;
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 0;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent, transparent);
+    transition: background 0.3s;
+  }
+  .metric-card.accent-teal  { --accent: var(--teal); border-color: rgba(29,158,117,0.25); }
+  .metric-card.accent-blue  { --accent: var(--blue);  border-color: rgba(55,138,221,0.25); }
+  .metric-card.accent-amber { --accent: var(--amber); border-color: rgba(239,159,39,0.25); }
+  .metric-card.accent-red   { --accent: var(--red);   border-color: rgba(226,75,74,0.25); }
+
+  .metric-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .metric-value {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+    transition: color 0.3s;
+  }
+  .metric-value .unit { font-size: 13px; color: var(--text2); font-weight: 400; margin-left: 3px; }
+  .metric-sub {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 5px;
+    font-family: var(--mono);
+  }
+
+  .panels-row {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 10px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+  }
+
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text2);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .gauge-svg { width: 100%; max-width: 220px; }
+
+  .gauge-big {
+    font-family: var(--mono);
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--text);
+    text-align: center;
+    line-height: 1;
+    transition: color 0.4s;
+  }
+  .gauge-status-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    text-align: center;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .ctrl-grid { display: flex; flex-direction: column; gap: 10px; }
+
+  .ctrl-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    transition: all 0.3s;
+  }
+  .ctrl-item.active-teal  { border-color: rgba(29,158,117,0.4); background: rgba(29,158,117,0.08); }
+  .ctrl-item.active-blue  { border-color: rgba(55,138,221,0.4); background: rgba(55,138,221,0.08); }
+  .ctrl-item.active-red   { border-color: rgba(226,75,74,0.4);  background: rgba(226,75,74,0.08); }
+  .ctrl-item.active-amber { border-color: rgba(239,159,39,0.4); background: rgba(239,159,39,0.08); }
+
+  .ctrl-name { font-size: 13px; font-weight: 500; color: var(--text); }
+  .ctrl-desc { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+
+  .toggle-pill {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 10px;
+    letter-spacing: 0.05em;
+    transition: all 0.3s;
+  }
+  .toggle-on-teal  { background: rgba(29,158,117,0.2); color: var(--teal-light); }
+  .toggle-on-blue  { background: rgba(55,138,221,0.2);  color: #85B7EB; }
+  .toggle-on-red   { background: rgba(226,75,74,0.2);   color: #F09595; }
+  .toggle-on-amber { background: rgba(239,159,39,0.2);  color: var(--amber); }
+  .toggle-off      { background: rgba(139,148,158,0.1); color: var(--text3); }
+
+  .divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+  .cal-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    padding: 3px 0;
+  }
+  .cal-row span:last-child { color: var(--text2); }
+
+  .chart-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+  }
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chart-legend {
+    display: flex;
+    gap: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .leg { display: flex; align-items: center; gap: 5px; }
+  .leg-line { width: 16px; height: 2px; border-radius: 1px; }
+  .leg-dash { width: 16px; height: 2px; border-radius: 1px; background: repeating-linear-gradient(90deg,#378ADD 0,#378ADD 4px,transparent 4px,transparent 7px); }
+
+  .input-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+
+  input[type="number"] {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 9px 14px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    width: 180px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="number"]:focus { border-color: var(--teal); }
+  input[type="number"]::placeholder { color: var(--text3); }
+
+  .slider-wrap { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 200px; }
+  .slider-label { font-family: var(--mono); font-size: 11px; color: var(--text3); white-space: nowrap; }
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border2);
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--teal);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+  .slider-val { font-family: var(--mono); font-size: 13px; color: var(--teal-light); min-width: 40px; text-align: right; font-weight: 700; }
+
+  button {
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 9px 16px;
+    color: var(--text2);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  button:hover { border-color: var(--teal); color: var(--teal-light); background: var(--teal-dim); }
+  button:active { transform: scale(0.97); }
+  button.btn-primary {
+    background: var(--teal-dim);
+    border-color: rgba(29,158,117,0.5);
+    color: var(--teal-light);
+  }
+  button.btn-primary:hover { background: rgba(29,158,117,0.25); }
+  button.btn-danger {
+    border-color: rgba(226,75,74,0.3);
+    color: #F09595;
+  }
+  button.btn-danger:hover { background: var(--red-dim); border-color: rgba(226,75,74,0.5); }
+
+  .log-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+  }
+
+  .log-list {
+    font-family: var(--mono);
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 220px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+  .log-list::-webkit-scrollbar { width: 4px; }
+  .log-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .log-entry {
+    display: flex;
+    gap: 10px;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity:0; transform: translateX(-4px); } to { opacity:1; transform: none; } }
+
+  .log-ts  { color: var(--text3); flex-shrink: 0; width: 70px; }
+  .log-ok  { color: var(--teal-light); }
+  .log-hi  { color: var(--red); }
+  .log-lo  { color: var(--amber); }
+  .log-err { color: var(--text3); }
+  .log-sys { color: var(--text3); }
+
+  .alarm-banner {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    border: 1px solid;
+    margin-bottom: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    animation: slideDown 0.3s ease;
+  }
+  @keyframes slideDown { from { opacity:0; transform: translateY(-8px); } to { opacity:1; transform: none; } }
+  .alarm-banner.show { display: flex; }
+  .alarm-high { background: var(--red-dim); border-color: rgba(226,75,74,0.4); color: var(--red); }
+  .alarm-low  { background: var(--amber-dim); border-color: rgba(239,159,39,0.4); color: var(--amber); }
+
+  .threshold-bar-wrap { margin-top: 8px; }
+  .tbar-label { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .tbar { position: relative; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+  .tbar-normal { position: absolute; left: 30%; width: 50%; height: 100%; background: rgba(29,158,117,0.35); }
+  .tbar-fill { position: absolute; left: 0; height: 100%; border-radius: 4px; transition: width 0.5s, background 0.5s; background: var(--teal); }
+  .tbar-marker { position: absolute; top: 0; bottom: 0; width: 1.5px; background: rgba(255,255,255,0.25); }
+
+  footer {
+    text-align: center;
+    padding: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+    letter-spacing: 0.04em;
+  }
+
+  @media (max-width: 700px) {
+    main { padding: 14px; }
+    .panels-row { grid-template-columns: 1fr; }
+    header { padding: 0 14px; }
+    .header-right .time-display { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">〜</div>
+    HUMID<span style="color:var(--text2);font-weight:400;">MONITOR</span>
+  </div>
+  <div class="header-right">
+    <div class="time-display" id="clock">--:--:--</div>
+    <div class="status-badge status-normal" id="badge">
+      <span class="dot"></span>
+      <span id="badge-text">NORMAL</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ALARM BANNER -->
+  <div class="alarm-banner" id="alarm-banner"></div>
+
+  <!-- METRICS -->
+  <div class="section-label">Pembacaan sensor</div>
+  <div class="metrics-grid">
+    <div class="metric-card accent-teal">
+      <div class="metric-label">Kelembaban (Terkalibrasi)</div>
+      <div class="metric-value" id="m-val">—<span class="unit">% RH</span></div>
+      <div class="metric-sub" id="m-raw">Raw: — %</div>
+    </div>
+    <div class="metric-card accent-blue">
+      <div class="metric-label">Moving average (N=5)</div>
+      <div class="metric-value" id="m-ma">—<span class="unit">%</span></div>
+      <div class="metric-sub">Referensi statistik saja</div>
+    </div>
+    <div class="metric-card accent-amber">
+      <div class="metric-label">Simpangan σ</div>
+      <div class="metric-value" id="m-std">—<span class="unit">%</span></div>
+      <div class="metric-sub">Standar deviasi</div>
+    </div>
+    <div class="metric-card accent-red">
+      <div class="metric-label">Total alarm</div>
+      <div class="metric-value" id="m-alarm">0</div>
+      <div class="metric-sub" id="m-read">0 pembacaan</div>
+    </div>
+  </div>
+
+  <!-- PANELS ROW -->
+  <div class="section-label" style="margin-top:16px;">Status sistem</div>
+  <div class="panels-row">
+
+    <!-- GAUGE -->
+    <div class="panel">
+      <div class="panel-title">Gauge kelembaban</div>
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 220 130">
+          <path d="M22 118 A90 90 0 0 1 198 118" fill="none" stroke="#1e2530" stroke-width="14" stroke-linecap="round"/>
+          <path d="M22 118 A90 90 0 0 1 198 118" fill="none" stroke="rgba(29,158,117,0.15)" stroke-width="14" stroke-linecap="round"/>
+          <path id="gauge-track" d="M22 118 A90 90 0 0 1 198 118" fill="none" stroke="var(--teal)" stroke-width="14" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="283" style="transition:stroke-dashoffset .6s, stroke .4s"/>
+          <line x1="54"  y1="118" x2="54"  y2="100" stroke="rgba(239,159,39,0.5)" stroke-width="1.5" stroke-dasharray="3 2"/>
+          <line x1="166" y1="118" x2="166" y2="100" stroke="rgba(226,75,74,0.5)"  stroke-width="1.5" stroke-dasharray="3 2"/>
+          <text x="47"  y="95" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#854F0B">30%</text>
+          <text x="173" y="95" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#A32D2D">80%</text>
+        </svg>
+        <div class="gauge-big" id="gauge-val">— %</div>
+        <div class="gauge-status-text" id="gauge-status">MENUNGGU DATA</div>
+
+        <div class="threshold-bar-wrap" style="width:100%;max-width:200px;margin-top:12px;">
+          <div class="tbar-label">
+            <span>0%</span><span>50%</span><span>100%</span>
+          </div>
+          <div class="tbar">
+            <div class="tbar-normal"></div>
+            <div id="tbar-fill" class="tbar-fill" style="width:0%"></div>
+            <div class="tbar-marker" style="left:30%"></div>
+            <div class="tbar-marker" style="left:80%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div style="display:flex;flex-direction:column;gap:10px;">
+
+      <!-- CONTROL STATUS -->
+      <div class="panel" style="flex:1;">
+        <div class="panel-title">Kontrol otomatis</div>
+        <div class="ctrl-grid">
+
+          <!-- ALARM -->
+          <div class="ctrl-item" id="ctrl-alm">
+            <div>
+              <div class="ctrl-name">Alarm</div>
+              <div class="ctrl-desc">ON jika RH &lt; 30% atau RH &gt; 80%</div>
+            </div>
+            <div class="toggle-pill toggle-off" id="pill-alm">OFF</div>
+          </div>
+
+          <!-- HUMIDIFIER -->
+          <div class="ctrl-item" id="ctrl-hum">
+            <div>
+              <div class="ctrl-name">Humidifier</div>
+              <div class="ctrl-desc">ON jika RH &lt; 30% | OFF jika RH &ge; 30%</div>
+            </div>
+            <div class="toggle-pill toggle-off" id="pill-hum">OFF</div>
+          </div>
+
+          <!-- DEHUMIDIFIER -->
+          <div class="ctrl-item" id="ctrl-deh">
+            <div>
+              <div class="ctrl-name">Dehumidifier</div>
+              <div class="ctrl-desc">ON jika RH &gt; 80% | OFF jika RH &le; 80%</div>
+            </div>
+            <div class="toggle-pill toggle-off" id="pill-deh">OFF</div>
+          </div>
+
+        </div>
+
+        <div class="divider"></div>
+
+        <div>
+          <div style="font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--text3);text-transform:uppercase;margin-bottom:8px;">Kalibrasi sensor (DHT22-01)</div>
+          <div class="cal-row"><span>Formula</span><span>y = gain × x + offset</span></div>
+          <div class="cal-row"><span>Gain</span><span>0.98</span></div>
+          <div class="cal-row"><span>Offset</span><span>+1.5% RH</span></div>
+          <div class="cal-row"><span>Batas normal</span><span>30% – 80% RH</span></div>
+          <div class="cal-row"><span>Error vs ref (60%)</span><span id="cal-err">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHART -->
+  <div class="section-label" style="margin-top:16px;">Tren real-time</div>
+  <div class="chart-panel">
+    <div class="chart-header">
+      <div class="panel-title" style="margin:0;">Riwayat pembacaan</div>
+      <div class="chart-legend">
+        <div class="leg"><div class="leg-line" style="background:var(--teal)"></div>Terkalibrasi (basis kontrol)</div>
+        <div class="leg"><div class="leg-dash"></div>Moving avg (statistik)</div>
+        <div class="leg"><div class="leg-line" style="background:rgba(226,75,74,0.5)"></div>Batas maks (80%)</div>
+        <div class="leg"><div class="leg-line" style="background:rgba(239,159,39,0.5)"></div>Batas min (30%)</div>
+      </div>
+    </div>
+    <div style="position:relative;width:100%;height:240px;">
+      <canvas id="chart" role="img" aria-label="Grafik tren kelembaban real-time"></canvas>
+    </div>
+  </div>
+
+  <!-- INPUT -->
+  <div class="section-label" style="margin-top:16px;">Input sensor</div>
+  <div class="input-panel">
+    <div class="input-row">
+      <input type="number" id="inp" min="0" max="100" step="0.1" placeholder="Nilai raw sensor (0–100)">
+      <button class="btn-primary" onclick="submitInput()">→ Kirim</button>
+      <button onclick="runDemo()">▶ Demo otomatis</button>
+      <button class="btn-danger" onclick="resetAll()">↺ Reset</button>
+    </div>
+    <div class="slider-wrap">
+      <span class="slider-label">Atau geser:</span>
+      <input type="range" id="slider" min="0" max="100" step="0.5" value="55"
+        oninput="document.getElementById('slider-out').textContent=parseFloat(this.value).toFixed(1)+'%'; document.getElementById('inp').value=this.value;">
+      <span class="slider-val" id="slider-out">55.0%</span>
+      <button onclick="submitSlider()">Kirim slider</button>
+    </div>
+    <div style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--text3);">
+      Logika kontrol: <span style="color:var(--text2);">
+        baca sensor → validasi → kalibrasi (y=0.98x+1.5) → keputusan berdasarkan nilai AKTUAL terkalibrasi → alarm/kontrol
+      </span>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="section-label" style="margin-top:16px;">Log sistem (sinkron output Rust)</div>
+  <div class="log-panel">
+    <div class="panel-title">Terminal output</div>
+    <div class="log-list" id="log"></div>
+  </div>
+
+</main>
+
+<footer>
+  SISTEM MONITORING KELEMBABAN &nbsp;/&nbsp; TEKNIK INSTRUMENTASI ITS &nbsp;/&nbsp;
+  ETS ALGORITMA DAN PEMROGRAMAN 2025/2026 &nbsp;/&nbsp; BAHASA RUST
+</footer>
+
+<script>
+// ============================================================
+// KONSTANTA — sinkron dengan main.rs
+// ============================================================
+const GAIN          = 0.98;   // sama dengan sensor.gain di Rust
+const OFFSET        = 1.5;    // sama dengan sensor.offset di Rust
+const KELEMBABAN_MIN = 30.0;  // sama dengan KELEMBABAN_MIN di Rust
+const KELEMBABAN_MAX = 80.0;  // sama dengan KELEMBABAN_MAX di Rust
+const WINDOW_MA     = 5;      // sama dengan WINDOW_MA di Rust
+
+let buf = [], totalRead = 0, totalAlarm = 0, demoTimer = null;
+const labArr = [], calArr = [], maArr = [];
+
+// ============================================================
+// FUNGSI NUMERIK — sinkron dengan impl Sensor & MonitoringSystem
+// ============================================================
+
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+// Rumus kalibrasi: y = gain * x + offset  (sama dengan fn baca() di Rust)
+function calibrate(raw) {
+  return clamp(GAIN * raw + OFFSET, 0.0, 100.0);
+}
+
+// Moving average dari buffer (sama dengan fn moving_average() di Rust)
+function movAvg(b) {
+  if (b.length === 0) return 0.0;
+  return b.reduce((a, x) => a + x, 0) / b.length;
+}
+
+// Standar deviasi (sama dengan fn simpangan() di Rust)
+function stdDev(b) {
+  if (b.length < 2) return 0.0;
+  const m = movAvg(b);
+  return Math.sqrt(b.map(x => (x - m) ** 2).reduce((a, x) => a + x, 0) / b.length);
+}
+
+// Timestamp HH:MM:SS
+function ts() {
+  const d = new Date();
+  return [d.getHours(), d.getMinutes(), d.getSeconds()]
+    .map(v => String(v).padStart(2, '0')).join(':');
+}
+
+// ============================================================
+// CLOCK
+// ============================================================
+setInterval(() => { document.getElementById('clock').textContent = ts(); }, 1000);
+
+// ============================================================
+// CHART
+// ============================================================
+const ctx = document.getElementById('chart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: labArr,
+    datasets: [
+      {
+        label: 'Terkalibrasi',
+        data: calArr,
+        borderColor: '#1D9E75',
+        backgroundColor: 'rgba(29,158,117,0.06)',
+        borderWidth: 2,
+        pointRadius: 4,
+        pointBackgroundColor: '#1D9E75',
+        pointBorderColor: '#0d1117',
+        pointBorderWidth: 2,
+        tension: 0.3,
+        fill: true
+      },
+      {
+        label: 'Moving avg',
+        data: maArr,
+        borderColor: '#378ADD',
+        borderWidth: 2,
+        borderDash: [5, 4],
+        pointRadius: 0,
+        tension: 0.4,
+        fill: false
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 400 },
+    plugins: { legend: { display: false } },
+    scales: {
+      y: {
+        min: 0, max: 100,
+        grid: { color: 'rgba(255,255,255,0.05)' },
+        ticks: { color: '#484f58', font: { family: 'Space Mono', size: 10 }, callback: v => v + '%' }
+      },
+      x: {
+        grid: { display: false },
+        ticks: { color: '#484f58', font: { family: 'Space Mono', size: 10 }, maxTicksLimit: 12, maxRotation: 0 }
+      }
+    }
+  }
+});
+
+// ============================================================
+// LOG
+// ============================================================
+function addLog(msg, cls) {
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  el.innerHTML = `<span class="log-ts">${ts()}</span><span class="${cls}">${msg}</span>`;
+  const list = document.getElementById('log');
+  list.appendChild(el);
+  list.scrollTop = list.scrollHeight;
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function setGauge(val) {
+  const pct = clamp(val, 0, 100) / 100;
+  const offset = 283 * (1 - pct);
+  const tr = document.getElementById('gauge-track');
+  tr.style.strokeDashoffset = offset.toFixed(1);
+  const color = val > KELEMBABAN_MAX ? '#E24B4A' : val < KELEMBABAN_MIN ? '#EF9F27' : '#1D9E75';
+  tr.style.stroke = color;
+  document.getElementById('tbar-fill').style.width = (pct * 100).toFixed(1) + '%';
+  document.getElementById('tbar-fill').style.background = color;
+}
+
+function setBadge(st) {
+  const b = document.getElementById('badge'), t = document.getElementById('badge-text');
+  b.className = 'status-badge';
+  if      (st === 'normal') { b.classList.add('status-normal'); t.textContent = 'NORMAL'; }
+  else if (st === 'high')   { b.classList.add('status-high');   t.textContent = 'ALARM TINGGI'; }
+  else if (st === 'low')    { b.classList.add('status-low');    t.textContent = 'ALARM RENDAH'; }
+  else                      { b.classList.add('status-error');  t.textContent = 'SENSOR ERROR'; }
+}
+
+function setCtrl(id, pillId, on, colorClass, pillClass, pillText) {
+  const c = document.getElementById(id), p = document.getElementById(pillId);
+  c.className = 'ctrl-item' + (on ? ' ' + colorClass : '');
+  p.className = 'toggle-pill ' + (on ? pillClass : 'toggle-off');
+  p.textContent = pillText;
+}
+
+function showAlarm(show, type, msg) {
+  const el = document.getElementById('alarm-banner');
+  if (!show) { el.classList.remove('show'); return; }
+  el.className = 'alarm-banner show alarm-' + type;
+  el.innerHTML = `<span>⚠</span> ${msg}`;
+}
+
+// ============================================================
+// PROCESS — logika SINKRON dengan fn proses() di Rust
+// Keputusan kontrol berdasarkan nilai sensor AKTUAL terkalibrasi,
+// bukan moving average. Moving average hanya untuk statistik.
+// ============================================================
+function process(raw) {
+  // Validasi input (sama dengan fn baca() — cek SENSOR_MIN_VALID & SENSOR_MAX_VALID)
+  if (isNaN(raw) || raw < 0 || raw > 100) {
+    addLog('[ERROR] Data sensor tidak valid: ' + raw, 'log-err');
+    setBadge('error');
+    showAlarm(false);
+    return;
+  }
+
+  // Kalibrasi: y = gain * x + offset
+  const cal = calibrate(raw);
+  totalRead++;
+
+  // Buffer moving average (sama dengan fn tambah_data())
+  if (buf.length >= WINDOW_MA) buf.shift();
+  buf.push(cal);
+
+  // Hitung statistik
+  const ma  = movAvg(buf);
+  const std = stdDev(buf);
+  const err = Math.abs(cal - 60.0);  // error terhadap referensi 60% RH
+
+  // Update chart
+  const lbl = '#' + totalRead;
+  labArr.push(lbl);
+  calArr.push(parseFloat(cal.toFixed(2)));
+  maArr.push(parseFloat(ma.toFixed(2)));
+  if (labArr.length > 25) { labArr.shift(); calArr.shift(); maArr.shift(); }
+  chart.update();
+
+  // Update metric cards
+  document.getElementById('m-val').innerHTML  = cal.toFixed(2) + '<span class="unit">% RH</span>';
+  document.getElementById('m-raw').textContent = 'Raw: ' + raw.toFixed(1) + '% → Kalibrasi: ' + cal.toFixed(2) + '%';
+  document.getElementById('m-ma').innerHTML   = ma.toFixed(2) + '<span class="unit">%</span>';
+  document.getElementById('m-std').innerHTML  = std.toFixed(2) + '<span class="unit">%</span>';
+  document.getElementById('m-read').textContent = totalRead + ' pembacaan';
+  document.getElementById('cal-err').textContent = err.toFixed(2) + '%';
+
+  // Update gauge
+  setGauge(cal);
+  document.getElementById('gauge-val').textContent = cal.toFixed(2) + ' %';
+
+  // Log info sensor & numerik (mirip output Rust)
+  addLog('[SENSOR]    DHT22-01 | Nilai: ' + cal.toFixed(2) + '% RH | Status: OK', 'log-sys');
+  addLog('[KALIBRASI] Error vs ref (60% RH): ' + err.toFixed(2) + '%', 'log-sys');
+  addLog('[NUMERIK]   Moving Average (' + WINDOW_MA + ' data): ' + ma.toFixed(2) + '% RH', 'log-sys');
+  addLog('[NUMERIK]   Simpangan: ' + std.toFixed(2) + '%', 'log-sys');
+
+  // ============================================================
+  // LOGIKA KONTROL — sinkron dengan fn proses() di Rust
+  // Basis keputusan: nilai sensor AKTUAL (cal), BUKAN moving average
+  // ============================================================
+  let st = 'normal', humOn = false, dehOn = false, almOn = false;
+
+  if (cal > KELEMBABAN_MAX) {
+    // ── KELEMBABAN TERLALU TINGGI (> 80%) ──
+    st = 'high'; dehOn = true; almOn = true; totalAlarm++;
+    addLog('[STATUS]      Kelembaban terlalu tinggi: ' + cal.toFixed(2) + '% RH', 'log-hi');
+    addLog('[ALARM]       : ON',  'log-hi');
+    addLog('[HUMIDIFIER]  : OFF', 'log-hi');
+    addLog('[DEHUMIDIFIER]: ON',  'log-hi');
+    document.getElementById('gauge-status').textContent = 'TERLALU LEMBAB';
+    showAlarm(true, 'high',
+      'Kelembaban terlalu tinggi: ' + cal.toFixed(2) + '% RH — Dehumidifier diaktifkan');
+
+  } else if (cal < KELEMBABAN_MIN) {
+    // ── KELEMBABAN TERLALU RENDAH (< 30%) ──
+    st = 'low'; humOn = true; almOn = true; totalAlarm++;
+    addLog('[STATUS]      Kelembaban terlalu rendah: ' + cal.toFixed(2) + '% RH', 'log-lo');
+    addLog('[ALARM]       : ON',  'log-lo');
+    addLog('[HUMIDIFIER]  : ON',  'log-lo');
+    addLog('[DEHUMIDIFIER]: OFF', 'log-lo');
+    document.getElementById('gauge-status').textContent = 'TERLALU KERING';
+    showAlarm(true, 'low',
+      'Kelembaban terlalu rendah: ' + cal.toFixed(2) + '% RH — Humidifier diaktifkan');
+
+  } else {
+    // ── NORMAL (30% – 80%) ──
+    addLog('[STATUS]      Kelembaban normal: ' + cal.toFixed(2) + '% RH', 'log-ok');
+    addLog('[ALARM]       : OFF', 'log-ok');
+    addLog('[HUMIDIFIER]  : OFF', 'log-ok');
+    addLog('[DEHUMIDIFIER]: OFF', 'log-ok');
+    document.getElementById('gauge-status').textContent = 'KONDISI NORMAL';
+    showAlarm(false);
+  }
+
+  // Update badge & alarm counter
+  setBadge(st);
+  document.getElementById('m-alarm').textContent = totalAlarm;
+
+  // Update kontrol pills (urutan: Alarm, Humidifier, Dehumidifier)
+  setCtrl('ctrl-alm', 'pill-alm', almOn, 'active-red',  'toggle-on-red',  almOn ? 'ON' : 'OFF');
+  setCtrl('ctrl-hum', 'pill-hum', humOn, 'active-teal', 'toggle-on-teal', humOn ? 'ON' : 'OFF');
+  setCtrl('ctrl-deh', 'pill-deh', dehOn, 'active-blue', 'toggle-on-blue', dehOn ? 'ON' : 'OFF');
+}
+
+// ============================================================
+// INPUT HANDLERS
+// ============================================================
+function submitInput() {
+  const v = parseFloat(document.getElementById('inp').value);
+  process(v);
+  document.getElementById('inp').value = '';
+}
+
+function submitSlider() {
+  const v = parseFloat(document.getElementById('slider').value);
+  process(v);
+}
+
+// Demo sequence mencakup semua kondisi: normal, tinggi (>80), rendah (<30)
+const demoSeq = [55, 62, 70, 76, 83, 81, 72, 28, 25, 35, 55, 60, 65, 85, 50, 45, 58, 63, 70, 20];
+let demoIdx = 0;
+
+function runDemo() {
+  if (demoTimer) { clearInterval(demoTimer); demoTimer = null; return; }
+  demoIdx = 0;
+  addLog('[DEMO] Memulai demo otomatis (20 data)...', 'log-sys');
+  demoTimer = setInterval(() => {
+    if (demoIdx >= demoSeq.length) {
+      clearInterval(demoTimer); demoTimer = null;
+      addLog('[DEMO] Selesai.', 'log-sys');
+      return;
+    }
+    process(demoSeq[demoIdx++]);
+  }, 800);
+}
+
+function resetAll() {
+  buf = []; totalRead = 0; totalAlarm = 0;
+  labArr.length = 0; calArr.length = 0; maArr.length = 0;
+  chart.update();
+  ['m-val', 'm-ma', 'm-std'].forEach(id => {
+    document.getElementById(id).innerHTML = '—';
+  });
+  document.getElementById('m-alarm').textContent  = '0';
+  document.getElementById('m-read').textContent   = '0 pembacaan';
+  document.getElementById('m-raw').textContent    = 'Raw: — %';
+  document.getElementById('cal-err').textContent  = '—';
+  document.getElementById('gauge-val').textContent = '— %';
+  document.getElementById('gauge-status').textContent = 'MENUNGGU DATA';
+  document.getElementById('gauge-track').style.strokeDashoffset = '283';
+  document.getElementById('gauge-track').style.stroke = 'var(--teal)';
+  document.getElementById('tbar-fill').style.width = '0%';
+  setBadge('normal');
+  showAlarm(false);
+  setCtrl('ctrl-alm', 'pill-alm', false, '', 'toggle-off', 'OFF');
+  setCtrl('ctrl-hum', 'pill-hum', false, '', 'toggle-off', 'OFF');
+  setCtrl('ctrl-deh', 'pill-deh', false, '', 'toggle-off', 'OFF');
+  document.getElementById('log').innerHTML = '';
+  addLog('[SISTEM] Reset. Siap menerima data.', 'log-sys');
+  if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+}
+
+// Enter key shortcut
+document.getElementById('inp').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitInput();
+});
+
+// Inisialisasi log
+addLog(
+  '[SISTEM] Diinisialisasi. Batas: ' + KELEMBABAN_MIN + '%–' + KELEMBABAN_MAX +
+  '% RH | Gain=' + GAIN + ' | Offset=+' + OFFSET + ' | Basis kontrol: nilai AKTUAL terkalibrasi',
+  'log-sys'
+);
+</script>
+</body>
+</html>
