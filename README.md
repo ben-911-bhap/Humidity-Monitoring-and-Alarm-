@@ -13,17 +13,18 @@ Sistem monitoring kelembaban udara berbasis **Rust** dengan tampilan dashboard i
 | Ruben Tambarta Sitio | 2042251029 |
 
 **Mata Kuliah:** Algoritma Pemrograman  
-**Program Studi:** Institut Teknologi Sepuluh Nopember (ITS)
+**Program Studi:** D-4 Teknologi Rekayasa Instrumentasi Institut Teknologi Sepuluh Nopember (ITS)
 
 ---
 
 ## 📋 Deskripsi Program
 
-Program ini merupakan sistem **monitoring kelembaban udara** yang dibangun menggunakan bahasa pemrograman Rust. Data kelembaban dibaca dari sensor humidity dan ditampilkan secara visual melalui dashboard berbasis HTML di browser.
+Program ini merupakan sistem monitoring kelembaban udara yang dibangun menggunakan bahasa pemrograman Rust. Data kelembaban dibaca dari sensor humidity dan ditampilkan secara visual melalui dashboard berbasis HTML di browser.
 
 ### Fitur Utama:
 - 📊 Dashboard monitoring kelembaban real-time
-- ⚠️ Sistem alarm ketika kelembaban melebihi batas normal
+- 🎮 Sistem control Humidifier dan Dehumidifier ketika kelembaban kurang atau melebihi batas normal
+- ⚠️ Sistem safety alarm ketika kelembaban melebihi batas normal
 - 🖥️ Tampilan antarmuka berbasis web (HTML)
 
 ---
